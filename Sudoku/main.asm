@@ -4,7 +4,7 @@ INCLUDE Irvine32.inc
 gamePath BYTE "level1.txt",0 ;this will point to sudoku folder
 
 ; gets value after calling OpenGameFile procedure
-gamePlayFileHandle DWORD ?
+gamePlayFileHandle DWORD ?
 
 BOARD_SIZE = 81
 board BYTE BOARD_SIZE dup(0)
