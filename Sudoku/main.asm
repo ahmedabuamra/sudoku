@@ -22,6 +22,16 @@ BOARD_SIZE = 81
 board BYTE BOARD_SIZE dup(?), 0
 solvedBoard BYTE BOARD_SIZE dup(?), 0
 
+
+; console menu options
+continue_game BYTE "1 -  Continue previous game.", 0
+new_game BYTE "2 -  New game.", 0
+username BYTE "Please enter your name.", 0
+user_name BYTE 10 dup(?)
+level_selection BYTE "Please Select Difficulty [1-3] (Note: 1 is easy).", 0
+difficulty BYTE 0
+random_board BYTE 0
+
 .CODE
 ; input:
 ;	edx: offset of file path string, for example -> filename BYTE "myfile.txt",0
@@ -180,6 +190,46 @@ finalcheck PROC uses ebx edx ecx eax
 	ret
 finalCheck endp
 
+;Ahmed & Omar area
+
+random proc
+	call Randomize            
+	mov  eax,3		;always from 0 to n-1           
+	call RandomRange	;return in eax
+	add eax, 1
+	mov random_board,ah
+    ret
+random endp
+
+menu proc
+	mov edx,offset continue_game
+	call writestring
+	call crlf
+	mov edx, offset new_game
+	call writestring
+	call crlf
+	call readdec
+	cmp eax, 1
+	;
+	; call continue previos game function here
+	;
+	mov edx,offset username
+	call writestring
+	call crlf
+	mov edx,offset user_name
+	mov ecx,10
+	call readstring
+	call crlf
+	mov edx,offset level_selection
+	call writestring
+	call crlf
+	call readdec
+	mov difficulty, ah
+	call game
+	ret 
+menu endp
+
+;Ahmed & Omar area
 
 
 main PROC
