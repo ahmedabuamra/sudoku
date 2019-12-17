@@ -1,13 +1,21 @@
 
 INCLUDE Irvine32.inc
 .DATA
+; files paths
 gamePath BYTE "level1.txt",0 ;this will point to sudoku folder
+solvedGamePath BYTE "solution1.txt", 0
+tmpPath BYTE "tmp.txt", 0
 
 ; gets value after calling OpenGameFile procedure
 gamePlayFileHandle DWORD ?
+solvedGamePlayFileHandle DWORD ?
+tmpPlayFileHandle DWORD ?
 
+
+; boards variables
 BOARD_SIZE = 81
-board BYTE BOARD_SIZE dup(0)
+board BYTE BOARD_SIZE dup(?), 0
+solvedBoard BYTE BOARD_SIZE dup(?), 0
 
 .CODE
 ; input:
@@ -46,51 +54,75 @@ _ReadFromFile ENDP
 
 ; return
 ;	gamePlayFileHandle: handle file of the game play, should be constant during the same game.
-OpenGameFile PROC
+OpenGameFiles PROC
+	;loading unsolved
 	mov edx, OFFSET gamePath ; filename should be path to level file
 	call _OpenInputFile
 	mov gamePlayFileHandle, eax
+
+	;loading solved
+	mov edx, OFFSET solvedGamePath ; filename should be path to level file
+	call _OpenInputFile
+	mov solvedGamePlayFileHandle, eax
 	ret
-OpenGameFile ENDP
+OpenGameFiles ENDP
 
 
 ; @TODO: check the error "Error 5: Access is denied."
-; writes the content of board in the level path. e.g. gamePlayFileHandle
+; writes the content of board in tmp.txt file
 SaveGame PROC
-	mov ecx, BOARD_SIZE
-	mov eax, gamePlayFileHandle
+	mov edx, OFFSET tmpPath ; filename should be path to level file
+	call _OpenInputFile
+	mov tmpPlayFileHandle, eax
+
 	mov edx, OFFSET board
+	mov ecx, BOARD_SIZE
+	mov eax, tmpPlayFileHandle
 	call WriteToFile
 
 	; check for error (source: page 170 from the book).
 	cmp eax, 0
 	ja SUCCESS 
 	call WriteWindowsMsg
+
 	SUCCESS:
+	mov eax, tmpPlayFileHandle
+	call CloseFile
 	ret
 SaveGame ENDP
 
-ReadGameFile PROC
+
+ReadGameFiles PROC
 	mov edx, OFFSET board ; points to buffer
 	mov ecx, BOARD_SIZE ; max bytes to read
+	mov eax, gamePlayFileHandle
+	call _ReadFromFile
+	
+	mov edx, OFFSET solvedBoard ; points to buffer
+	mov ecx,  BOARD_SIZE ; max bytes to read
+	mov eax, solvedGamePlayFileHandle
 	call _ReadFromFile 
 	ret
-ReadGameFile ENDP
+ReadGameFiles ENDP
 
 
 
 
 
 main PROC
-	call OpenGameFile ; assigns gamePlayFileHandle
+	call OpenGameFiles ; assigns gamePlayFileHandle
 
-	call ReadGameFile ; read the board and store it in board variable
+	call ReadGameFiles ; read the board and store it in board variable
 	
 	;============================
 	; print the file content
+	mov edx, OFFSET solvedBoard ;mov edx to the beginning of string
+	call WriteString
+	call crlf
+
+
 	mov edx, OFFSET board ;mov edx to the beginning of string
 	call WriteString
-	; new line
 	call crlf
 	;============================
 
