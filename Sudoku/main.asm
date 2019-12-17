@@ -3,6 +3,11 @@ INCLUDE Irvine32.inc
 .DATA
 gamePath BYTE "level1.txt",0 ;this will point to sudoku folder
 
+currentGame BYTE 81 dup(?) ; should filled initialy with the game numbers.   
+solvedGame  BYTE 81 dup(?) ; should have solved game numbers.
+gameStatus BYTE 81 dup(0)  ; each cell have number 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
+boolEqual BYTE 1   	   ; 1 if all currentGame matched with solvedGame and 0 if not.  
+
 ; gets value after calling OpenGameFile procedure
 gamePlayFileHandle DWORD ?
 
@@ -77,7 +82,75 @@ ReadGameFile PROC
 	ret
 ReadGameFile ENDP
 
+; compare proc work with currentGame and solvedGame "Char Arrays".
+; gameStatus will be affected after the proc finised.
+; each index will have one of three *integer value* 0 for empty cell, 1 for mathced and 2 for unmatched. 
 
+compare PROC uses ebx edx ebp ecx eax
+
+	mov ebx, offset currentGame
+	mov edx, offset solvedGame
+	mov ebp, offset gameStatus
+	mov ecx, 81
+
+   	L:
+		mov al, [edx]
+		cmp al, [ebx]
+		je equal
+
+		mov al, '0'
+		cmp al, [ebx]
+		je free
+		jmp wrong
+
+		free :
+		mov al, 0
+		mov[ebp], al
+		jmp cont
+
+		equal :
+		mov al, 1
+		mov[ebp], al
+		jmp cont
+
+		wrong :
+		mov al, 2
+		mov[ebp], al
+		jmp cont
+
+		cont :
+		inc ebx
+		inc edx
+		inc ebp
+
+	loop L
+	ret
+compare endp
+
+;finalcheck work with currentGame and solvedGame array *char Arrays*.
+;return 1 in boolEqual if all currentGame cells matched with solvedGame and 0 if not.  
+
+finalcheck PROC uses ebx edx ecx eax
+
+	mov ebx, offset currentGame
+	mov edx, offset solvedGame
+	mov ecx, 81
+
+	L:
+			mov al, [ebx]
+			cmp al, [edx]
+			jne wr
+
+			inc ebx
+			inc edx
+	loop L
+		
+			jmp finish
+			wr :
+			mov boolEqual, 0
+			finish :
+	ret
+finalCheck endp
 
 
 
