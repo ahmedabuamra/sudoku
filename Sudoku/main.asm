@@ -1,15 +1,16 @@
-
 INCLUDE Irvine32.inc
 .DATA
 ; files paths
-gamePath BYTE "level1.txt",0 ;this will point to sudoku folder
-solvedGamePath BYTE "solution1.txt", 0
+gamePath BYTE "Sudoku Boards\diff_0_0.txt",0 ;this will point to sudoku folder
+solvedGamePath BYTE "Sudoku Boards\diff_0_0_solved.txt",0
 tmpPath BYTE "tmp.txt", 0
 
 currentGame BYTE 81 dup(?) ; should filled initialy with the game numbers.   
 solvedGame  BYTE 81 dup(?) ; should have solved game numbers.
 gameStatus BYTE 81 dup(0)  ; each cell have number 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
 boolEqual BYTE 1   	   ; 1 if all currentGame matched with solvedGame and 0 if not.  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ; gets value after calling OpenGameFile procedure
 gamePlayFileHandle DWORD ?
@@ -17,20 +18,14 @@ solvedGamePlayFileHandle DWORD ?
 tmpPlayFileHandle DWORD ?
 
 
-; boards variables
+; boards variables                       THESE ARE THE VARIABLES WE ARE USING IN THE PROJECT
 BOARD_SIZE = 81
-board BYTE BOARD_SIZE dup(?), 0
-solvedBoard BYTE BOARD_SIZE dup(?), 0
-
-
-; console menu options
-continue_game BYTE "1 -  Continue previous game.", 0
-new_game BYTE "2 -  New game.", 0
-username BYTE "Please enter your name.", 0
-user_name BYTE 10 dup(?)
-level_selection BYTE "Please Select Difficulty [1-3] (Note: 1 is easy).", 0
-difficulty BYTE 0
-random_board BYTE 0
+board BYTE BOARD_SIZE dup(?), 0						;Array containing original unsolved board
+solvedBoard BYTE BOARD_SIZE dup(?), 0				;Array containing solved board
+difficulty BYTE '2'                                 ;The difficulty the user selects
+randomBoard BYTE '2'								;The random board generated
+currentBoard BYTE BOARD_SIZE dup(?)                 ;The Board that gets updated
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .CODE
 ; input:
@@ -190,66 +185,96 @@ finalcheck PROC uses ebx edx ecx eax
 	ret
 finalCheck endp
 
-;Ahmed & Omar area
+;Print: Prints an array in the form of a Sudoku board
+;Recieves edx contains offset of an array and
+;Returns: That array printed in the Sudoku form
 
-random proc
-	call Randomize            
-	mov  eax,3		;always from 0 to n-1           
-	call RandomRange	;return in eax
-	add eax, 1
-	mov random_board,ah
-    ret
-random endp
+Print PROC uses edx 
 
-menu proc
-	mov edx,offset continue_game
-	call writestring
-	call crlf
-	mov edx, offset new_game
-	call writestring
-	call crlf
-	call readdec
-	cmp eax, 1
-	;
-	; call continue previos game function here
-	;
-	mov edx,offset username
-	call writestring
-	call crlf
-	mov edx,offset user_name
-	mov ecx,10
-	call readstring
-	call crlf
-	mov edx,offset level_selection
-	call writestring
-	call crlf
-	call readdec
-	mov difficulty, ah
-	call game
-	ret 
-menu endp
+	mov ecx,81
+	mov ebx,0     ;counter
+	L1:
+		mov al , [edx]
+		call writechar 
+		mov al, ' '
+		call writechar
+		inc edx
+		inc ebx
+		cmp ebx,9
+		je LeaveLine
+		jmp EndLoop
+		LeaveLine:
+			mov ebx,0
+			call crlf
+		EndLoop:
+	loop L1
 
-;Ahmed & Omar area
+	ret
+Print endp
+
+
+LevelFill PROC
+	mov edx, OFFSET gamePath
+	add edx,19
+	mov al, difficulty
+	mov [edx], al
+	add edx,2
+	mov al, randomBoard
+	mov [edx],al
+
+	mov edx, OFFSET solvedGamePath
+	add edx,19
+	mov al, difficulty
+	mov [edx], al
+	add edx,2
+	mov al, randomBoard
+	mov [edx],al
+	call OpenGameFiles ; assigns gamePlayFileHandle
+	call ReadGameFiles ; read the board and store it in board variable
+	
+	CALL Restart
+LevelFill endp
+
+Restart PROC
+	mov ecx, 81
+	mov eax, offset board
+	mov ebx, offset currentBoard
+	L1:									;Copying board into currentBoard
+		mov esi, [eax]
+		mov [ebx],esi
+		inc ebx
+		inc eax
+	loop L1
+Restart endp
+
+
+Game PROC
+	
+	ret
+Game endp
 
 
 main PROC
-	call OpenGameFiles ; assigns gamePlayFileHandle
+	;call OpenGameFiles ; assigns gamePlayFileHandle
 
-	call ReadGameFiles ; read the board and store it in board variable
-	
+	;call ReadGameFiles ; read the board and store it in board variable
+	call LevelFill
 	;============================
 	; print the file content
 	mov edx, OFFSET solvedBoard ;mov edx to the beginning of string
-	call WriteString
-	call crlf
+	;call WriteString
+	;call crlf
 
 
 	mov edx, OFFSET board ;mov edx to the beginning of string
-	call WriteString
-	call crlf
+	;call WriteString
+	;call crlf
 	;============================
 
-	call SaveGame ;saves board
+	mov edx,offset currentboard
+	call Print
+
+	;call SaveGame ;saves board
 	exit
 main ENDP
 
