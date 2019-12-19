@@ -5,12 +5,7 @@ gamePath BYTE "Sudoku Boards\diff_0_0.txt",0 ;this will point to sudoku folder
 solvedGamePath BYTE "Sudoku Boards\diff_0_0_solved.txt",0
 tmpPath BYTE "tmp.txt", 0
 
-currentGame BYTE 81 dup(?) ; should filled initialy with the game numbers.   
-solvedGame  BYTE 81 dup(?) ; should have solved game numbers.
-gameStatus BYTE 81 dup(0)  ; each cell have number 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
-boolEqual BYTE 1   	   ; 1 if all currentGame matched with solvedGame and 0 if not.  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; gets value after calling OpenGameFile procedure
 gamePlayFileHandle DWORD ?
@@ -20,11 +15,20 @@ tmpPlayFileHandle DWORD ?
 
 ; boards variables                       THESE ARE THE VARIABLES WE ARE USING IN THE PROJECT
 BOARD_SIZE = 81
-board BYTE BOARD_SIZE dup(?), 0						;Array containing original unsolved board
+ZERO	    = 0
+ONE 	    = 1
+TWO 	    = 2
+ONE_HUNDRED = 100 
+board BYTE BOARD_SIZE dup(?), 0					;Array containing original unsolved board
 solvedBoard BYTE BOARD_SIZE dup(?), 0				;Array containing solved board
-difficulty BYTE '2'                                 ;The difficulty the user selects
-randomBoard BYTE '2'								;The random board generated
-currentBoard BYTE BOARD_SIZE dup(?)                 ;The Board that gets updated
+difficulty BYTE '2'                                   		;The difficulty the user selects
+randomBoard BYTE '2'						;The random board generated
+currentBoard BYTE BOARD_SIZE dup(?)                 		;The Board that gets updated
+boardStatus  BYTE  BOARD_SIZE dup(?)				;each cell have 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
+boolEqual    BYTE  1   						;1 if all currentGame matched with solvedGame and 0 if not.  
+wrongCounter word  0						; count the number of cells which matched with the solved board.
+rightCounter word  0						; count the number of cells which dosen't matched with the solved board.
+score	     sword 0					        ; this will have the user final score. 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .CODE
@@ -114,39 +118,40 @@ ReadGameFiles PROC
 	ret
 ReadGameFiles ENDP
 
-; compare proc work with currentGame and solvedGame "Char Arrays".
-; gameStatus will be affected after the proc finised.
+; compare proc work with currentBoard and solvedBoard "Char Arrays".
+; boardStatus will be affected after the proc finised.
 ; each index will have one of three *integer value* 0 for empty cell, 1 for mathced and 2 for unmatched. 
 
 compare PROC uses ebx edx ebp ecx eax
 
-	mov ebx, offset currentGame
-	mov edx, offset solvedGame
-	mov ebp, offset gameStatus
-	mov ecx, 81
+	mov ebx, offset currentBoard
+	mov edx, offset solvedBoard
+	mov ebp, offset boardStatus
+	mov ecx, BOARD_SIZE 
 
-   	L:
+   	beginToEnd: 
+
 		mov al, [edx]
 		cmp al, [ebx]
-		je equal
+		je equal		; if the cell in currentBoard equal the one in the solved, jump to the equal label which will put 1 in statusGame. 
 
 		mov al, '0'
 		cmp al, [ebx]
-		je free
-		jmp wrong
+		je free		    ; if the cell in currentBoard equal zero, jump to free label which will put 0 in statusGame.  
+		jmp wrong		; else will jump to wrong label which will put 2 in statusGame.
 
 		free :
-		mov al, 0
+		mov al, zero
 		mov[ebp], al
 		jmp cont
 
 		equal :
-		mov al, 1
+		mov al, one
 		mov[ebp], al
 		jmp cont
 
 		wrong :
-		mov al, 2
+		mov al, two
 		mov[ebp], al
 		jmp cont
 
@@ -155,34 +160,128 @@ compare PROC uses ebx edx ebp ecx eax
 		inc edx
 		inc ebp
 
-	loop L
+	loop beginToEnd
+	
 	ret
-compare endp
+compare ENDP
 
-;finalcheck work with currentGame and solvedGame array *char Arrays*.
+;finalcheck work with currentBoard and solvedBoard array *char Arrays*.
 ;return 1 in boolEqual if all currentGame cells matched with solvedGame and 0 if not.  
 
 finalcheck PROC uses ebx edx ecx eax
 
-	mov ebx, offset currentGame
-	mov edx, offset solvedGame
-	mov ecx, 81
+	mov ebx, offset currentBoard
+	mov edx, offset solvedBoard
+	mov ecx, BOARD_SIZE
 
-	L:
-			mov al, [ebx]
-			cmp al, [edx]
-			jne wr
+	beginToEnd:
 
-			inc ebx
-			inc edx
-	loop L
-		
-			jmp finish
-			wr :
-			mov boolEqual, 0
-			finish :
+		mov al, [ebx]
+		cmp al, [edx]
+		jne wrong
+		inc ebx
+		inc edx
+	
+	loop beginToEnd
+	jmp finish
+	
+	wrong:
+		mov boolEqual, 0
+	
+	finish:
+
 	ret
-finalCheck endp
+finalCheck ENDP
+
+
+; calculateScore PROC calcuate the user score according this formula (rightCells-wrongCells)*100 and work with boardStatus
+; you have to call compare PROC before using this PROC (to fill the boardStatus Array)
+; to find the score you have to use this instruction "movsx eax, score"
+; and also you should use "call writeint" as maybe the score be negative
+
+calculateScore PROC uses eax ecx edx 
+
+	mov edx, OFFSET boardStatus
+	mov ecx,BOARD_SIZE
+	beginToEnd:	
+		movzx eax,byte ptr [edx]
+		cmp eax,1
+		jne wrong
+
+		inc rightCounter 
+		jmp continue
+		
+		wrong:
+		inc wrongCounter
+
+		continue:
+		inc edx
+	LOOP beginToEnd
+	
+		mov ax, wrongCounter
+		sub rightCounter,ax
+		mov ax, rightCounter
+		mov cx, ONE_HUNDRED
+		imul cx
+		mov score,ax
+
+	ret
+calculateScore ENDP
+
+; writecharGreen print the char which in eax register in Green color
+; you have to move the char you need to print to the eax registr
+writecharGreen PROC uses edx eax
+	
+	mov edx,eax
+	mov eax,2           ; make color Green
+	call setTextColor
+
+	mov eax,edx        
+	call writechar
+	
+	mov eax,7           
+	call setTextColor    ; make color White again 
+	 
+	ret
+writecharGreen ENDP
+
+
+; writecharBlack print the char which in eax register in Black color
+; you have to move the char you need to print to the eax registr
+
+writecharBlack PROC uses edx eax
+	
+	mov edx,eax
+	mov eax,0           ; make color Black
+	call setTextColor
+
+	mov eax,edx       
+	call writechar
+	
+	mov eax,7           
+	call setTextColor    ; make color White again 
+	 
+	ret
+writecharBlack ENDP
+
+; writecharRed print the char which in eax register in Red color
+; you have to move the char you need to print to the eax registr
+
+writecharRed PROC uses edx eax
+	
+	mov edx,eax
+	mov eax,12           ; make color Red
+	call setTextColor
+
+	mov eax,edx       
+	call writechar
+	
+	mov eax,7           
+	call setTextColor    ; make color White again 
+		 
+	ret
+writecharRed ENDP
+
 
 ;Print: Prints an array in the form of a Sudoku board
 ;Recieves edx contains offset of an array and
