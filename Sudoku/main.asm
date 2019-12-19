@@ -78,11 +78,10 @@ OpenGameFiles PROC
 OpenGameFiles ENDP
 
 
-; @TODO: check the error "Error 5: Access is denied."
 ; writes the content of board in tmp.txt file
 SaveGame PROC
 	mov edx, OFFSET tmpPath ; filename should be path to level file
-	call _OpenInputFile
+	call CreateOutputFile
 	mov tmpPlayFileHandle, eax
 
 	mov edx, OFFSET board
