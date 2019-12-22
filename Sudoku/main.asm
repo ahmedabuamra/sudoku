@@ -20,18 +20,103 @@ ONE 	    = 1
 TWO 	    = 2
 ONE_HUNDRED = 100 
 board BYTE BOARD_SIZE dup(?), 0					;Array containing original unsolved board
-solvedBoard BYTE BOARD_SIZE dup(?), 0				;Array containing solved board
-difficulty BYTE '2'                                   		;The difficulty the user selects
-randomBoard BYTE '2'						;The random board generated
-currentBoard BYTE BOARD_SIZE dup(?)                 		;The Board that gets updated
-boardStatus  BYTE  BOARD_SIZE dup(?)				;each cell have 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
-boolEqual    BYTE  1   						;1 if all currentGame matched with solvedGame and 0 if not.  
-wrongCounter word  0						; count the number of cells which matched with the solved board.
-rightCounter word  0						; count the number of cells which dosen't matched with the solved board.
+solvedBoard BYTE BOARD_SIZE dup(?), 0			;Array containing solved board
+difficulty BYTE 0                               ;The difficulty the user selects
+randomBoard BYTE 0								;The random board generated
+printingCounter DWORD 0
+currentBoard BYTE BOARD_SIZE dup(?)             ;The Board that gets updated
+boardStatus  BYTE  BOARD_SIZE dup(?)			;each cell have 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
+boolEqual    BYTE  1   							;1 if all currentGame matched with solvedGame and 0 if not.  
+wrongCounter word  0							; count the number of cells which matched with the solved board.
+rightCounter word  0							; count the number of cells which dosen't matched with the solved board.
 score	     sword 0					        ; this will have the user final score. 
+level_selection BYTE "Please Select Difficulty [1-3] (Note: 1 is easy).", 0	
+continue_game BYTE "1 -  Continue previous game.", 0
+new_game BYTE "2 -  New game.", 0
+username BYTE "Please enter your name.", 0
+user_name BYTE 10 dup(?)
+
+rowCounter DWORD 0
+colCounter DWORD 1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                 Game Strings
+selectionString BYTE "1- Change a number in the board", 0
+selectionString2 BYTE "2- Restart the board", 0
+selectionString3 BYTE "3- Submit your board", 0
+selectionString4 BYTE "4- Save game", 0
+choice BYTE "Enter you choice: ",0
+
+selectRow BYTE "Select the desired Row: ", 0
+selectCol BYTE "Select the desired Column: ", 0
+selectValue BYTE "Select the desired Value: ", 0
+selectedRow BYTE ?
+selectedCol BYTE ?
+selectedVal BYTE ?
+index Byte ?
+FailMsg BYTE "Please Enter a correct index",0
+FailMsg2 BYTE "Please Enter a correct choice",0
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .CODE
+
+; yasser
+random proc uses eax
+	call Randomize		;sets seed         
+	mov  eax,3		    ;RandomRange pick random number from 0 to EAX-1           
+	call RandomRange	;return in EAX
+	add eax, 1
+	mov randomBoard,al
+    ret
+random endp
+
+menu proc
+	StartProc:
+	mov edx,offset continue_game
+	call writestring
+	call crlf
+	mov edx, offset new_game
+	call writestring
+	call crlf
+	call readdec
+
+	cmp eax, 1
+	je ContinuePreviousGame
+	cmp eax, 2
+	je NewGame
+	mov edx ,offset FailMsg2
+	call writestring
+	call crlf
+	JMP StartProc
+
+	ContinuePreviousGame:
+		call Load
+		jmp EndMe
+
+	NewGame:
+	mov edx,offset username
+	call writestring
+	call crlf
+
+	mov edx,offset user_name
+	mov ecx,10
+	call readstring
+
+	mov edx,offset level_selection
+	call writestring
+	call crlf
+
+	call readdec
+	mov difficulty, al
+
+	call random
+
+	EndMe:
+	call LevelFill
+	;ret 
+menu endp
+;
+
 ; input:
 ;	edx: offset of file path string, for example -> filename BYTE "myfile.txt",0
 ; return
@@ -287,31 +372,108 @@ writecharRed ENDP
 ;Recieves edx contains offset of an array and
 ;Returns: That array printed in the Sudoku form
 
-Print PROC uses edx 
+Print PROC uses edx edi
+	mov ecx, 9
+	mov al, ' '
+	call writechar
+	mov al, ' '
+	call writechar
+	mov al, ' '
+	call writechar
+	mov al, ' '
+	call writechar
+	L2:
+		mov al, '['
+		call writechar
+		mov eax,rowCounter
+		call writedec
+		add eax,1
+		mov rowCounter, eax
+		mov al, ']'
+		call writechar
+		mov al, ' '
+		call writechar
 
+	loop L2
+	call crlf
+	call crlf
+	mov al, '['
+	call writechar
+	mov al, '0'
+	call writechar
+	mov al, ']'
+	call writechar
+	mov al, ' '
+	call writechar
 	mov ecx,81
 	mov ebx,0     ;counter
+	mov printingCounter, ebx
 	L1:
+		mov al, ' '
+		call writechar
 		mov al , [edx]
+		mov bl,'0'
+		mov bh,[edi]
+		cmp bl,bh
+		je WriteNormal
+		WriteGreen:
+		call writecharGreen
+		jmp EndWrite
+		WriteNormal:
 		call writechar 
+		EndWrite:
+		mov al, ' '
+		call writechar
 		mov al, ' '
 		call writechar
 		inc edx
+		mov ebx,printingCounter
 		inc ebx
+		mov printingCounter,ebx
+		inc edi
 		cmp ebx,9
 		je LeaveLine
-		jmp EndLoop
+		jmp EndProc
 		LeaveLine:
-			mov ebx,0
 			call crlf
-		EndLoop:
-	loop L1
-
+			mov esi,colCounter
+			cmp esi,9
+			je EndProc
+			mov ebx,0
+			mov printingCounter,ebx
+			call crlf
+			mov al, '['
+			call writechar
+			mov eax,colCounter
+			add eax,'0'
+			call writechar
+			mov al, ']'
+			call writechar
+			mov al, ' '
+			call writechar
+			inc colCounter
+			EndProc:
+	dec ecx
+	cmp ecx,0
+	jne L1
+	call crlf
+	mov eax,0
+	mov rowCounter, eax
+	mov eax,1
+	mov colCounter,eax
 	ret
 Print endp
 
 
 LevelFill PROC
+	mov bl, difficulty
+	add bl, '0'
+	mov difficulty, bl
+
+	mov bl, randomBoard
+	add bl, '0'
+	mov randomBoard, bl
+
 	mov edx, OFFSET gamePath
 	add edx,19
 	mov al, difficulty
@@ -347,30 +509,119 @@ Restart endp
 
 
 Game PROC
-	
-	ret
+	Start:
+	mov edx,offset currentboard
+	mov edi,offset board
+	call Print
+	call crlf
+	mov edx, offset selectionString
+	call writestring
+	call crlf
+	mov edx, offset selectionString2
+	call writestring
+	call crlf
+	mov edx, offset selectionString3
+	call writestring
+	call crlf
+	mov edx, offset selectionString4
+	call writestring
+	call crlf
+	mov edx, offset choice
+	call writestring
+	call readdec
+
+	cmp eax,1
+	je choice1
+	cmp eax,2
+	je choice2
+	cmp eax,3
+	je choice3
+	cmp eax,4
+	je choice4
+
+	choice1:
+		call InsertProc
+		jmp Start
+	choice2:
+		call Restart
+		jmp Start
+	choice3:
+		call Submit                                         
+		jmp Endgame
+	choice4:
+		call SaveGame                                        
+		jmp Endgame
+	Endgame:
+		exit
+		ret
 Game endp
 
+InsertProc PROC
+	RestartProc:
+	mov edx,offset selectRow
+	call writestring
+	call readdec
+	mov selectedRow,al
+	mov edx,offset selectCol
+	call writestring
+	call readdec
+	mov selectedCol,al
+	mov edx,offset selectValue
+	call writestring
+	call readdec
+	mov selectedVal,al
+	mov al , 9
+	mov bl , selectedRow
+	mul bl
+	add al,selectedCol
+	mov ebx, offset board
+	add ebx,eax
+	mov cl,[ebx]
+	mov dl, '0'
+	cmp cl,dl
+	jne Failled
+	mov edx, offset currentBoard
+	add edx , eax
+	mov al, selectedVal
+	add al , '0'
+	mov [edx], al
+	jmp EndProc
+	Failled:
+		mov edx, offset FailMsg
+		call writestring
+		call crlf
+		jmp RestartProc
+	EndProc:	
+		ret
+InsertProc endp
+
+Submit PROC                 ;SALEH
+
+	ret
+Submit ENDP
+
+Load PROC                  ;ABUAMRA
+
+	ret
+Load ENDP
 
 main PROC
 	;call OpenGameFiles ; assigns gamePlayFileHandle
 
 	;call ReadGameFiles ; read the board and store it in board variable
-	call LevelFill
+	call menu
+	call game
 	;============================
 	; print the file content
-	mov edx, OFFSET solvedBoard ;mov edx to the beginning of string
+	;mov edx, OFFSET solvedBoard ;mov edx to the beginning of string
 	;call WriteString
 	;call crlf
 
 
-	mov edx, OFFSET board ;mov edx to the beginning of string
+	;	mov edx, OFFSET board ;mov edx to the beginning of string
 	;call WriteString
 	;call crlf
 	;============================
-
-	mov edx,offset currentboard
-	call Print
 
 	;call SaveGame ;saves board
 	exit
