@@ -5,6 +5,9 @@ gamePath BYTE "Sudoku Boards\diff_0_0.txt",0 ;this will point to sudoku folder
 solvedGamePath BYTE "Sudoku Boards\diff_0_0_solved.txt",0
 tmpPath BYTE "tmp.txt", 0
 GamesPlayedPath BYTE "Games Played\0.txt", 0
+GamesPlayedCount BYTE "Games Played\Number Of Games.txt", 0
+GamesCount BYTE 6 dup(?),0
+GamesCountInt BYTE 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -12,6 +15,8 @@ GamesPlayedPath BYTE "Games Played\0.txt", 0
 gamePlayFileHandle DWORD ?
 solvedGamePlayFileHandle DWORD ?
 tmpPlayFileHandle DWORD ?
+GamesPlayedFileHandle DWORD ?
+GamesPlayedCountFileHandle DWORD ?
 
 
 ; boards variables                       THESE ARE THE VARIABLES WE ARE USING IN THE PROJECT
@@ -37,11 +42,12 @@ continue_game BYTE "1 -  Continue previous game.", 0
 new_game BYTE "2 -  New game.", 0
 username BYTE "Please enter your name.", 0
 user_name BYTE 10 dup(?)
+user_name_size BYTE ?
 rowCounter DWORD 0
 colCounter DWORD 1
 initialTime DWORD ?
 finalTime DWORD ?
-
+time BYTE "00000000",0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                 Game Strings
 selectionString BYTE "1- Change a number in the board", 0
@@ -105,6 +111,7 @@ menu proc
 	mov edx,offset user_name
 	mov ecx,10
 	call readstring
+	mov user_name_size,al
 
 	mov edx,offset level_selection
 	call writestring
@@ -617,14 +624,14 @@ Submit PROC                 ;SALEH
 
 	call compare	   ; statusBoard now has the values which will represent the color in the console.
 	call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved.
-	mov eax ,1
+
 	INVOKE GetTickCount
 	sub eax,initialTime
 	mov ebx, 1000
 	mov edx, 0
 	div ebx
 	call writedec
-
+	call crlf
 	ret
 Submit ENDP
 
@@ -633,8 +640,110 @@ Load PROC                  ;ABUAMRA
 	ret
 Load ENDP
 
+TopPlayers PROC
+	mov edx, OFFSET GamesPlayedCount ; filename should be path to level file
+	call _OpenInputFile
+	mov GamesPlayedCountFileHandle, eax
+
+	mov edx, OFFSET GamesCount ; points to buffer
+	mov ecx,  6; max bytes to read
+	mov eax, GamesPlayedCountFileHandle
+	call _ReadFromFile
+
+	mov edx, OFFSET GamesCount
+	mov al, 0
+	mov ecx,6
+	L1:
+		mov bl,[edx]
+		cmp bl,'0'
+		je EndLoop
+		mov bl, 10
+		MUL bl
+		mov bl, [edx]
+		sub bl, '0'
+		add al,bl
+		EndLoop:
+		add edx,1
+	LOOP L1
+	ret
+TopPlayers ENDP
+
+;Calculates the total time to be saved in a file
+;Uses GetTickCount Function
+;returns a string value of the total time in seconds in variable time
+CalculateTimeString PROC
+	INVOKE GetTickCount
+	sub eax,initialTime
+	mov ebx, 1000
+	mov edx, 0
+	div ebx
+	cmp eax,10
+	jl onee
+	cmp eax,100
+	jl twoo
+	cmp eax,1000
+	jl three
+	cmp eax,10000
+	jl fourr
+	cmp eax,100000
+	jl five
+	cmp eax,1000000
+	jl six
+	cmp eax,10000000
+	jl seven
+	cmp eax,100000000
+	jl eight
+
+	onee:
+		mov ebx,1
+		mov ecx,7
+		jmp looping
+	twoo:
+		mov ebx,2
+		mov ecx,6
+		jmp looping
+	three:
+		mov ebx,3
+		mov ecx,5
+		jmp looping
+	fourr:
+		mov ebx,4
+		mov ecx,4
+		jmp looping
+	five:
+		mov ebx,5
+		mov ecx,3
+		jmp looping
+	six:
+		mov ebx,6
+		mov ecx,2
+		jmp looping
+	seven:
+		mov ebx,7
+		mov ecx,1
+		jmp looping
+	eight:
+		mov ebx,8
+		mov ecx,0
+
+	looping:
+		mov edi,offset time
+		add edi,ecx
+		mov ecx,ebx
+		L2:
+			mov edx,0
+			mov esi,10
+			DIV esi
+			add edx,'0'
+			mov [edi],dl
+			inc edi
+		loop L2
+	ret
+CalculateTimeString ENDP
+
 main PROC
 	call menu
+	;call TopPlayers
 	exit
 main ENDP
 
