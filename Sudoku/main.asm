@@ -16,6 +16,7 @@ tmpPlayFileHandle DWORD ?
 ; boards variables                       THESE ARE THE VARIABLES WE ARE USING IN THE PROJECT
 BOARD_SIZE = 81
 ZERO	    = 0
+four	    = 4
 ONE 	    = 1
 TWO 	    = 2
 ONE_HUNDRED = 100 
@@ -24,8 +25,8 @@ solvedBoard BYTE BOARD_SIZE dup(?), 0			;Array containing solved board
 difficulty BYTE 0                               ;The difficulty the user selects
 randomBoard BYTE 0								;The random board generated
 printingCounter DWORD 0
-currentBoard BYTE BOARD_SIZE dup(?)             ;The Board that gets updated
-boardStatus  BYTE  BOARD_SIZE dup(?)			;each cell have 0,1 or 2 - 0 indecates an empty cell, 1 matched cell with the solved cell and 2 for not matched cell.     
+currentBoard BYTE  BOARD_SIZE dup(?)             ;The Board that gets updated
+boardStatus  BYTE  BOARD_SIZE dup(?)			;each cell have 0,1,2 or 4 - 0 indecates an empty cell, 1 matched cell with the solved cell, 2 for not matched cell and 4 for the cell which already esxist in teh original board .     
 boolEqual    BYTE  1   							;1 if all currentGame matched with solvedGame and 0 if not.  
 wrongCounter word  0							; count the number of cells which matched with the solved board.
 rightCounter word  0							; count the number of cells which dosen't matched with the solved board.
@@ -205,20 +206,22 @@ ReadGameFiles ENDP
 
 ; compare proc work with currentBoard and solvedBoard "Char Arrays".
 ; boardStatus will be affected after the proc finised.
-; each index will have one of three *integer value* 0 for empty cell, 1 for mathced and 2 for unmatched. 
+; each index will have one of three *integer value* 0 for empty cell, 1 for mathced , 2 for unmatched and 4 for the cell which already exist in the original board . 
 
 compare PROC uses ebx edx ebp ecx eax
 
 	mov ebx, offset currentBoard
 	mov edx, offset solvedBoard
 	mov ebp, offset boardStatus
+	mov edi, offset board
 	mov ecx, BOARD_SIZE 
+	
 
    	beginToEnd: 
 
 		mov al, [edx]
 		cmp al, [ebx]
-		je equal		; if the cell in currentBoard equal the one in the solved, jump to the equal label which will put 1 in statusGame. 
+		je equal 		; if the cell in currentBoard equal the one in the solved, jump to the equal label which will put 1 or 4 in statusGame depinding in the original board. 
 
 		mov al, '0'
 		cmp al, [ebx]
@@ -231,6 +234,9 @@ compare PROC uses ebx edx ebp ecx eax
 		jmp cont
 
 		equal :
+		mov al, [edi]
+		cmp al,'0'
+		jne alreadyExist
 		mov al, one
 		mov[ebp], al
 		jmp cont
@@ -240,11 +246,16 @@ compare PROC uses ebx edx ebp ecx eax
 		mov[ebp], al
 		jmp cont
 
+		alreadyExist:
+		mov al,four
+		mov[ebp], al
+		jmp cont
+
 		cont :
 		inc ebx
 		inc edx
 		inc ebp
-
+		inc edi 
 	loop beginToEnd
 	
 	ret
@@ -597,6 +608,9 @@ InsertProc endp
 
 Submit PROC                 ;SALEH
 
+	call compare	   ; statusBoard now has the values which will represent the color in the console.
+	call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved. 
+
 	ret
 Submit ENDP
 
@@ -609,8 +623,8 @@ main PROC
 	;call OpenGameFiles ; assigns gamePlayFileHandle
 
 	;call ReadGameFiles ; read the board and store it in board variable
-	call menu
-	call game
+	;;;;;;;;;;call menu
+	;;;;;;;;;;call game
 	;============================
 	; print the file content
 	;mov edx, OFFSET solvedBoard ;mov edx to the beginning of string
@@ -624,6 +638,8 @@ main PROC
 	;============================
 
 	;call SaveGame ;saves board
+	
+	
 	exit
 main ENDP
 
