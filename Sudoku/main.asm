@@ -4,6 +4,7 @@ INCLUDE Irvine32.inc
 gamePath BYTE "Sudoku Boards\diff_0_0.txt",0 ;this will point to sudoku folder
 solvedGamePath BYTE "Sudoku Boards\diff_0_0_solved.txt",0
 tmpPath BYTE "tmp.txt", 0
+GamesPlayedPath BYTE "Games Played\0.txt", 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -36,9 +37,11 @@ continue_game BYTE "1 -  Continue previous game.", 0
 new_game BYTE "2 -  New game.", 0
 username BYTE "Please enter your name.", 0
 user_name BYTE 10 dup(?)
-
 rowCounter DWORD 0
 colCounter DWORD 1
+initialTime DWORD ?
+finalTime DWORD ?
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                 Game Strings
 selectionString BYTE "1- Change a number in the board", 0
@@ -504,6 +507,9 @@ LevelFill PROC
 	call ReadGameFiles ; read the board and store it in board variable
 	
 	CALL Restart
+	INVOKE GetTickCount
+	mov initialTime, eax
+	call Game
 LevelFill endp
 
 Restart PROC
@@ -516,6 +522,7 @@ Restart PROC
 		inc ebx
 		inc eax
 	loop L1
+	ret
 Restart endp
 
 
@@ -560,7 +567,7 @@ Game PROC
 		call Submit                                         
 		jmp Endgame
 	choice4:
-		call SaveGame                                        
+		call SaveGame
 		jmp Endgame
 	Endgame:
 		exit
@@ -609,7 +616,14 @@ InsertProc endp
 Submit PROC                 ;SALEH
 
 	call compare	   ; statusBoard now has the values which will represent the color in the console.
-	call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved. 
+	call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved.
+	mov eax ,1
+	INVOKE GetTickCount
+	sub eax,initialTime
+	mov ebx, 1000
+	mov edx, 0
+	div ebx
+	call writedec
 
 	ret
 Submit ENDP
@@ -620,26 +634,7 @@ Load PROC                  ;ABUAMRA
 Load ENDP
 
 main PROC
-	;call OpenGameFiles ; assigns gamePlayFileHandle
-
-	;call ReadGameFiles ; read the board and store it in board variable
-	;;;;;;;;;;call menu
-	;;;;;;;;;;call game
-	;============================
-	; print the file content
-	;mov edx, OFFSET solvedBoard ;mov edx to the beginning of string
-	;call WriteString
-	;call crlf
-
-
-	;	mov edx, OFFSET board ;mov edx to the beginning of string
-	;call WriteString
-	;call crlf
-	;============================
-
-	;call SaveGame ;saves board
-	
-	
+	call menu
 	exit
 main ENDP
 
