@@ -6,6 +6,7 @@ solvedGamePath BYTE "Sudoku Boards\diff_0_0_solved.txt",0
 tmpPath BYTE "tmp.txt", 0
 GamesPlayedPath BYTE "Games Played\0.txt", 0
 GamesPlayedCount BYTE "Games Played\Number Of Games.txt", 0
+continuePath BYTE "continue.txt", 0
 GamesCount BYTE 6 dup(?),0
 GamesCountInt BYTE 0
 
@@ -17,6 +18,7 @@ solvedGamePlayFileHandle DWORD ?
 tmpPlayFileHandle DWORD ?
 GamesPlayedFileHandle DWORD ?
 GamesPlayedCountFileHandle DWORD ?
+continueFileHandle DWORD ?
 
 
 ; boards variables                       THESE ARE THE VARIABLES WE ARE USING IN THE PROJECT
@@ -26,6 +28,7 @@ four	    = 4
 ONE 	    = 1
 TWO 	    = 2
 ONE_HUNDRED = 100 
+continue_size= 113
 board BYTE BOARD_SIZE dup(?), 0					;Array containing original unsolved board
 solvedBoard BYTE BOARD_SIZE dup(?), 0			;Array containing solved board
 difficulty BYTE 0                               ;The difficulty the user selects
@@ -41,13 +44,16 @@ level_selection BYTE "Please Select Difficulty [1-3] (Note: 1 is easy).", 0
 continue_game BYTE "1 -  Continue previous game.", 0
 new_game BYTE "2 -  New game.", 0
 username BYTE "Please enter your name.", 0
-user_name BYTE 10 dup(?)
+user_name BYTE 10 dup(?),0
 user_name_size BYTE ?
 rowCounter DWORD 0
 colCounter DWORD 1
 initialTime DWORD ?
 finalTime DWORD ?
 time BYTE "00000000",0
+ContinueString BYTE continue_size dup ('0')
+correctCounter BYTE 0
+incorrectCounter BYTE 0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                 Game Strings
 selectionString BYTE "1- Change a number in the board", 0
@@ -65,6 +71,12 @@ selectedVal BYTE ?
 index Byte ?
 FailMsg BYTE "Please Enter a correct index",0
 FailMsg2 BYTE "Please Enter a correct choice",0
+redMsgString BYTE "Wrong answer, try again",0
+greenMsgString BYTE "Correct!",0
+correctStr BYTE "Number off correct attempts: ",0
+incorrectStr BYTE "Number off incorrect attempts: ",0
+timeStr BYTE "Total time is : ",0
+timeStrCont BYTE " seconds"
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -112,6 +124,18 @@ menu proc
 	mov ecx,10
 	call readstring
 	mov user_name_size,al
+	movzx ecx,al
+	mov edx,offset user_name
+	mov esi,10
+	sub esi,ecx
+	add edx,ecx
+	mov ecx,esi
+	;dec ecx
+	L1:						;filling rest of name withe spaces
+		mov al,' '
+		mov [edx],al
+		inc edx
+	loop L1
 
 	mov edx,offset level_selection
 	call writestring
@@ -179,14 +203,15 @@ OpenGameFiles ENDP
 
 
 ; writes the content of board in tmp.txt file
-SaveGame PROC
-	mov edx, OFFSET tmpPath ; filename should be path to level file
+Continue PROC
+	mov edx, OFFSET continuePath ; filename should be path to level file
 	call CreateOutputFile
-	mov tmpPlayFileHandle, eax
+	mov continueFileHandle, eax
 
-	mov edx, OFFSET board
-	mov ecx, BOARD_SIZE
-	mov eax, tmpPlayFileHandle
+	mov edx, OFFSET ContinueString
+	call writestring
+	mov ecx, continue_size
+	mov eax, continueFileHandle
 	call WriteToFile
 
 	; check for error (source: page 170 from the book).
@@ -195,13 +220,81 @@ SaveGame PROC
 	call WriteWindowsMsg
 
 	SUCCESS:
-	mov eax, tmpPlayFileHandle
+	mov eax, continueFileHandle
 	call CloseFile
+	ret
+Continue ENDP
+
+
+SaveGame PROC uses edx ecx eax esi edi ebx
+
+	mov edx, offset currentBoard
+	mov ecx,9
+	mov eax,offset ContinueString
+		
+	currentboardLoop:
+	mov esi,ecx
+	mov ecx,9
+
+	CurrentRows:
+	mov edi,[edx]
+	mov [eax],edi
+	inc edx
+	inc eax    
+	Loop CurrentRows
+	
+	mov byte ptr[eax],0Dh
+	inc eax
+	mov ecx,esi
+	LOOP currentboardLoop
+
+	mov eax,offset ContinueString
+	add eax,90
+
+	mov edx,offset user_name
+	mov ecx,10
+	usernameContLoop:
+	mov edi,[edx]
+	mov [eax],edi
+	inc edx
+	inc eax    
+	LOOP usernameContLoop
+	
+	mov byte ptr[eax],0Dh
+	inc eax
+	mov bl,randomBoard
+	mov [eax],bl
+
+	inc eax
+	mov bl,0dh
+	mov [eax],bl
+	
+	inc eax
+	mov bl,difficulty
+	mov [eax],bl
+
+	inc eax
+	mov byte ptr[eax],0Dh
+	
+	call CalculateTimeString
+	mov ecx,8
+	mov edx,offset time
+	mov eax, offset ContinueString
+	add eax,105
+
+	TimeLoop:
+	mov edi,[edx]
+	mov [eax],edi
+	inc edx
+	inc eax    
+	LOOP TimeLoop
+	
+	call Continue
 	ret
 SaveGame ENDP
 
 
-ReadGameFiles PROC
+ReadGameFiles PROC uses edx ecx eax
 	mov edx, OFFSET board ; points to buffer
 	mov ecx, BOARD_SIZE ; max bytes to read
 	mov eax, gamePlayFileHandle
@@ -315,12 +408,12 @@ calculateScore PROC uses eax ecx edx
 		jne wrong
 
 		inc rightCounter 
-		jmp continue
+		jmp continuee
 		
 		wrong:
 		inc wrongCounter
 
-		continue:
+		continuee:
 		inc edx
 	LOOP beginToEnd
 	
@@ -581,7 +674,7 @@ Game PROC
 		ret
 Game endp
 
-InsertProc PROC
+InsertProc PROC uses eax ebx ecx edx esi
 	RestartProc:
 	mov edx,offset selectRow
 	call writestring
@@ -600,6 +693,8 @@ InsertProc PROC
 	mul bl
 	add al,selectedCol
 	mov ebx, offset board
+	mov esi, offset solvedBoard		;for checking if the solution is correct
+	add esi, eax
 	add ebx,eax
 	mov cl,[ebx]
 	mov dl, '0'
@@ -608,9 +703,32 @@ InsertProc PROC
 	mov edx, offset currentBoard
 	add edx , eax
 	mov al, selectedVal
+	mov bl,[esi]
 	add al , '0'
+	cmp al,bl
+	jne RedMessage       ;If the answer is wrong
 	mov [edx], al
+	mov edx,offset greenMsgString
+	mov eax,2           ; make color Green
+	call setTextColor
+	call crlf
+	call writestring
+	call crlf
+	mov eax,7           ; make color White
+	call setTextColor
+	inc correctCounter
 	jmp EndProc
+	RedMessage:
+		mov edx, offset redMsgString
+		mov eax,12           ; make color red
+		call setTextColor
+		call crlf
+		call writestring
+		call crlf
+		mov eax,7           ; make color White
+		call setTextColor
+		inc incorrectCounter
+		jmp EndProc
 	Failled:
 		mov edx, offset FailMsg
 		call writestring
@@ -620,53 +738,110 @@ InsertProc PROC
 		ret
 InsertProc endp
 
-Submit PROC                 ;SALEH
-
+Submit PROC
 	call compare	   ; statusBoard now has the values which will represent the color in the console.
 	call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved.
-
+	mov edx,offset correctStr
+	call writestring
+	mov al,correctCounter
+	call writedec
+	call crlf
+	mov edx,offset incorrectStr
+	call writestring
+	mov al,incorrectCounter
+	call writedec
+	call crlf
 	INVOKE GetTickCount
 	sub eax,initialTime
 	mov ebx, 1000
 	mov edx, 0
 	div ebx
+	mov edx, offset timeStr
+	call writestring
 	call writedec
+	mov edx, offset timeStrCont
+	call writestring
 	call crlf
 	ret
 Submit ENDP
 
-Load PROC                  ;ABUAMRA
+readContinue proc
 
+	mov edx,offset continuePath
+	call OpenInputFile
+	mov edx, OFFSET ContinueString ; points to buffer
+	mov ecx, continue_size ; max bytes to read
+	call ReadFromFile ; read the file
+	
+ret
+readContinue endp
+
+Load PROC
+
+	call readContinue	
+	mov edx, offset continueString
+	mov ebx, offset currentBoard
+
+	mov ecx,9
+
+	_currentboardLoop:
+	mov esi,ecx
+	mov ecx,9
+
+	_CurrentRows:
+	mov al,[edx]
+	mov [ebx],al
+	inc edx
+	inc ebx    
+	Loop _CurrentRows
+
+	inc edx
+	mov ecx,esi
+	LOOP _currentboardLoop
+
+	inc edx 
+	
+	mov edx, offset continueString
+	add edx,90
+	mov ebx, offset username
+	mov ecx,10
+	
+	_username:
+	mov al,[edx]
+	mov [ebx],eax
+	inc edx
+	inc ebx    
+	Loop _username
+
+	mov edx, offset continueString
+	add edx,101
+
+	mov al,[edx]
+	sub al,'0'
+	mov randomBoard,al
+
+	add edx,2
+	
+	mov al,[edx]
+	sub al,'0'
+	mov difficulty,al
+
+
+	mov edx, offset continueString
+	add edx,105
+	mov ecx,8
+	mov ebx,offset time
+	_time:
+	mov al,[edx]
+	mov [ebx],eax
+	inc edx
+	inc ebx    
+	Loop _time
+	;call CloseFile
+	call LevelFill
+	call Game
 	ret
 Load ENDP
-
-TopPlayers PROC
-	mov edx, OFFSET GamesPlayedCount ; filename should be path to level file
-	call _OpenInputFile
-	mov GamesPlayedCountFileHandle, eax
-
-	mov edx, OFFSET GamesCount ; points to buffer
-	mov ecx,  6; max bytes to read
-	mov eax, GamesPlayedCountFileHandle
-	call _ReadFromFile
-
-	mov edx, OFFSET GamesCount
-	mov al, 0
-	mov ecx,6
-	L1:
-		mov bl,[edx]
-		cmp bl,'0'
-		je EndLoop
-		mov bl, 10
-		MUL bl
-		mov bl, [edx]
-		sub bl, '0'
-		add al,bl
-		EndLoop:
-		add edx,1
-	LOOP L1
-	ret
-TopPlayers ENDP
 
 ;Calculates the total time to be saved in a file
 ;Uses GetTickCount Function
@@ -741,9 +916,91 @@ CalculateTimeString PROC
 	ret
 CalculateTimeString ENDP
 
+
+TopPlayers PROC
+	mov edx, OFFSET GamesPlayedCount ; filename should be path to level file
+	call _OpenInputFile
+	mov GamesPlayedCountFileHandle, eax
+
+	mov edx, OFFSET GamesCount ; points to buffer
+	mov ecx,  6; max bytes to read
+	mov eax, GamesPlayedCountFileHandle
+	call _ReadFromFile
+
+	mov esi, OFFSET GamesCount
+	mov al, 0
+	mov ecx,6
+	L1:
+		mov bl,10
+		mul bl
+		mov bl,[esi]
+		sub bl,'0'
+		add al,bl
+		inc esi
+	LOOP L1
+	inc al
+	mov GamesCountInt,al
+	movzx eax,GamesCountInt
+	call writedec
+	cmp eax,10
+	jl onee
+	cmp eax,100
+	jl twoo
+	cmp eax,1000
+	jl three
+	cmp eax,10000
+	jl fourr
+	cmp eax,100000
+	jl five
+	cmp eax,1000000
+	jl six
+	cmp eax,10000000
+
+	onee:
+		mov ebx,1
+		mov ecx,7
+		jmp looping
+	twoo:
+		mov ebx,2
+		mov ecx,6
+		jmp looping
+	three:
+		mov ebx,3
+		mov ecx,5
+		jmp looping
+	fourr:
+		mov ebx,4
+		mov ecx,4
+		jmp looping
+	five:
+		mov ebx,5
+		mov ecx,3
+		jmp looping
+	six:
+		mov ebx,6
+		mov ecx,2
+		jmp looping
+
+	looping:
+		mov edi,offset GamesCount
+		add edi,ecx
+		mov ecx,ebx
+		L2:
+			mov edx,0
+			mov esi,10
+			DIV esi
+			add edx,'0'
+			mov [edi],dl
+			inc edi
+		loop L2
+		mov edx, offset GamesCount
+		call writestring
+	ret
+TopPlayers ENDP
+
 main PROC
 	call menu
-	;call TopPlayers
+	call TopPlayers
 	exit
 main ENDP
 
