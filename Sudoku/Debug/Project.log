@@ -1,2 +1,4 @@
 ﻿  Assembling main.asm...
+main.asm(152): warning A6001: no return from procedure
+main.asm(641): warning A6001: no return from procedure
   Project.vcxproj -> C:\Users\world\Desktop\E\sudoku\Sudoku\Debug\Project.exe
