@@ -35,7 +35,7 @@ difficulty BYTE 0                               ;The difficulty the user selects
 randomBoard BYTE 0								;The random board generated
 printingCounter DWORD 0
 currentBoard BYTE  BOARD_SIZE dup(?)             ;The Board that gets updated
-boardStatus  BYTE  BOARD_SIZE dup(?)			;each cell have 0,1,2 or 4 - 0 indecates an empty cell, 1 matched cell with the solved cell, 2 for not matched cell and 4 for the cell which already esxist in teh original board .     
+boardStatus  BYTE  BOARD_SIZE dup(?)			;each cell have 0,1,2 or 4 - 0 indecates an empty cell, 1 matched cell with the solved cell, 2 for not matched cell and 4 for the cell which already esxist in the original board .     
 boolEqual    BYTE  1   							;1 if all currentGame matched with solvedGame and 0 if not.  
 wrongCounter word  0							; count the number of cells which matched with the solved board.
 rightCounter word  0							; count the number of cells which dosen't matched with the solved board.
@@ -49,11 +49,13 @@ user_name_size BYTE ?
 rowCounter DWORD 0
 colCounter DWORD 1
 initialTime DWORD ?
+continueTime BYTE 0
 finalTime DWORD ?
 time BYTE "00000000",0
 ContinueString BYTE continue_size dup ('0')
 correctCounter BYTE 0
 incorrectCounter BYTE 0
+stepsCount BYTE 0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                 Game Strings
 selectionString BYTE "1- Change a number in the board", 0
@@ -73,8 +75,9 @@ FailMsg BYTE "Please Enter a correct index",0
 FailMsg2 BYTE "Please Enter a correct choice",0
 redMsgString BYTE "Wrong answer, try again",0
 greenMsgString BYTE "Correct!",0
-correctStr BYTE "Number off correct attempts: ",0
-incorrectStr BYTE "Number off incorrect attempts: ",0
+correctStr BYTE "Number of correct attempts: ",0
+incorrectStr BYTE "Number of incorrect attempts: ",0
+stepsStr BYTE "Number of steps needed to complete the board: ",0
 timeStr BYTE "Total time is : ",0
 timeStrCont BYTE " seconds"
 ;
@@ -289,7 +292,24 @@ SaveGame PROC uses edx ecx eax esi edi ebx
 	inc eax    
 	LOOP TimeLoop
 	
-	call Continue
+	mov edx, OFFSET continuePath ; filename should be path to level file
+	call CreateOutputFile
+	mov continueFileHandle, eax
+
+	mov edx, OFFSET ContinueString
+	call writestring
+	mov ecx, continue_size
+	mov eax, continueFileHandle
+	call WriteToFile
+
+	; check for error (source: page 170 from the book).
+	cmp eax, 0
+	ja SUCCESS 
+	call WriteWindowsMsg
+
+	SUCCESS:
+	mov eax, continueFileHandle
+	call CloseFile
 	ret
 SaveGame ENDP
 
@@ -311,11 +331,11 @@ ReadGameFiles ENDP
 ; boardStatus will be affected after the proc finised.
 ; each index will have one of three *integer value* 0 for empty cell, 1 for mathced , 2 for unmatched and 4 for the cell which already exist in the original board . 
 
-compare PROC uses ebx edx ebp ecx eax
+compare PROC uses ebx edx esi ecx eax
 
 	mov ebx, offset currentBoard
 	mov edx, offset solvedBoard
-	mov ebp, offset boardStatus
+	mov esi, offset boardStatus
 	mov edi, offset board
 	mov ecx, BOARD_SIZE 
 	
@@ -333,7 +353,7 @@ compare PROC uses ebx edx ebp ecx eax
 
 		free :
 		mov al, zero
-		mov[ebp], al
+		mov[esi], al
 		jmp cont
 
 		equal :
@@ -341,23 +361,23 @@ compare PROC uses ebx edx ebp ecx eax
 		cmp al,'0'
 		jne alreadyExist
 		mov al, one
-		mov[ebp], al
+		mov[esi], al
 		jmp cont
 
 		wrong :
 		mov al, two
-		mov[ebp], al
+		mov[esi], al
 		jmp cont
 
 		alreadyExist:
 		mov al,four
-		mov[ebp], al
+		mov[esi], al
 		jmp cont
 
 		cont :
 		inc ebx
 		inc edx
-		inc ebp
+		inc esi
 		inc edi 
 	loop beginToEnd
 	
@@ -448,10 +468,10 @@ writecharGreen ENDP
 ; writecharBlack print the char which in eax register in Black color
 ; you have to move the char you need to print to the eax registr
 
-writecharBlack PROC uses edx eax
+writecharBlue PROC uses edx eax
 	
 	mov edx,eax
-	mov eax,0           ; make color Black
+	mov eax,9           ; make color Black
 	call setTextColor
 
 	mov eax,edx       
@@ -461,7 +481,7 @@ writecharBlack PROC uses edx eax
 	call setTextColor    ; make color White again 
 	 
 	ret
-writecharBlack ENDP
+writecharBlue ENDP
 
 ; writecharRed print the char which in eax register in Red color
 ; you have to move the char you need to print to the eax registr
@@ -738,9 +758,47 @@ InsertProc PROC uses eax ebx ecx edx esi
 		ret
 InsertProc endp
 
-Submit PROC
+Submit PROC uses eax ebx edx
 	call compare	   ; statusBoard now has the values which will represent the color in the console.
-	call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved.
+	mov esi, offset boardStatus
+	mov ebx, offset solvedBoard
+	mov ecx, 81
+	mov edi,0
+	PrintFinal:
+		mov al,[ebx]
+		mov dl,[esi]
+		cmp dl,0
+		je WriteBlue
+		call writecharGreen
+		jmp EndLoop
+		WriteBlue:
+			call writecharBlue
+			inc stepsCount
+		EndLoop:
+		mov al,' '
+		call writechar
+		call writechar
+		call writechar
+		inc edi
+		cmp edi,9
+		je EndLine
+		jmp Ending
+		EndLine:
+			call crlf
+			call crlf
+			mov edi,0
+		Ending:
+		inc esi
+		inc ebx
+	loop PrintFinal
+
+	;call finalcheck    ; boolEqaul now has 1 if the player board matched with the solved.
+
+	mov edx,offset stepsStr
+	call writestring
+	mov al,stepsCount
+	call writedec
+	call crlf
 	mov edx,offset correctStr
 	call writestring
 	mov al,correctCounter
@@ -756,6 +814,7 @@ Submit PROC
 	mov ebx, 1000
 	mov edx, 0
 	div ebx
+	add al,continueTime
 	mov edx, offset timeStr
 	call writestring
 	call writedec
@@ -765,7 +824,7 @@ Submit PROC
 	ret
 Submit ENDP
 
-readContinue proc
+readContinue proc uses ecx edx
 
 	mov edx,offset continuePath
 	call OpenInputFile
@@ -776,7 +835,7 @@ readContinue proc
 ret
 readContinue endp
 
-Load PROC
+Load PROC uses eax ebx ecx edx esi
 
 	call readContinue	
 	mov edx, offset continueString
@@ -827,16 +886,19 @@ Load PROC
 	mov difficulty,al
 
 
-	mov edx, offset continueString
-	add edx,105
+	mov esi, offset continueString
+	add esi,105
 	mov ecx,8
-	mov ebx,offset time
+	mov al,0
 	_time:
-	mov al,[edx]
-	mov [ebx],eax
-	inc edx
-	inc ebx    
+	mov dl,10
+	MUL dl
+	mov dl,[esi]
+	sub dl,'0'
+	add al,dl
+	inc esi 
 	Loop _time
+	mov continueTime,al
 	;call CloseFile
 	call LevelFill
 	call Game
